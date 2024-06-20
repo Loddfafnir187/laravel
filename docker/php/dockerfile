@@ -1,0 +1,32 @@
+FROM php:8.1-fpm
+
+# Установка зависимостей
+RUN apt-get update && apt-get install -y \
+    libzip-dev \
+    unzip \
+    git \
+    curl \
+    && docker-php-ext-install zip pdo pdo_mysql
+
+# Установка Composer
+RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+#COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
+# Установка Node.js и npm
+RUN curl -sL https://deb.nodesource.com/setup_16.x | bash - \
+    && apt-get install -y nodejs
+
+# Установка зависимостей PHP и JS
+WORKDIR /var/www
+COPY ./src /var/www
+RUN composer install \
+    && npm install \
+    && npm run dev
+#    && php artisan key:generate
+
+# Копирование и миграция базы данных
+COPY ./src /var/www
+#RUN php artisan migrate:fresh --seed
+
+EXPOSE 9000
+CMD ["php-fpm"]

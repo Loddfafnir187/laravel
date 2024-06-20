@@ -1,0 +1,87 @@
+version: '3.8'
+
+services:
+  nginx:
+    image: nginx:latest
+    container_name: nginx
+    ports:
+      - "8082:80"
+    volumes:
+      - ./src:/var/www/html
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - php
+    networks:
+      - app-network
+
+  php:
+    build:
+      context: .
+      dockerfile: ./docker/php/dockerfile
+    container_name: php
+    volumes:
+      - ./src:/var/www/html
+      - ./docker/php/local.ini:/usr/local/etc/php/conf.d/local.ini
+    networks:
+      - app-network
+    depends_on:
+      - writer_db
+      - reader_db
+
+
+
+  writer_db:
+    image: mysql:8.0
+    container_name: writer_db
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: writer_db
+      MYSQL_USER: writer_user
+      MYSQL_PASSWORD: writer_password
+    volumes:
+      - ./scripts/writer_init.sh:/sql_init/init.sh
+      - ./writer_db_data:/var/lib/mysql
+    entrypoint: ["sh", "/sql_init/init.sh"]
+    networks:
+      - app-network
+
+  reader_db:
+    image: mysql:8.0
+    container_name: reader_db
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: reader_db
+      MYSQL_USER: reader_user
+      MYSQL_PASSWORD: reader_password
+    volumes:
+      - ./scripts/reader_init.sh:/sql_init/init.sh
+      - ./reader_db_data:/var/lib/mysql
+    depends_on:
+      - writer_db
+    networks:
+      - app-network
+    entrypoint: ["sh", "/sql_init/init.sh"]
+
+  composer:
+    image: composer:2.1
+    container_name: composer
+    volumes:
+      - ./src:/var/www/html
+    working_dir: /var/www/html
+    command: ["composer", "install"]
+    networks:
+      - app-network
+
+ # node:
+  #  image: node:14
+  #  container_name: node
+  #  volumes:
+  #    - ./src:/var/www/html
+  #  working_dir: /var/www/html
+  #  command: ["sh", "-c", "npm install && npm run dev"]
+ #   networks:
+#      - app-network
+
+networks:
+  app-network:
+    driver: bridge
